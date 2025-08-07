@@ -1,9 +1,15 @@
 from dataclasses import dataclass
+import sys
+
+from genesis.engine.entities.rigid_entity.rigid_geom import RigidGeom
 
 from .vec3 import Vec3
 
 
 EPSILON = 1e-6
+EPSILON2 = EPSILON * EPSILON
+
+_MAX_RAY_DISTANCE = sys.float_info.max
 
 
 class Ray:
@@ -20,11 +26,19 @@ class Ray:
 
 @dataclass
 class RayHit:
-    is_hit: bool
     distance: float
-    normal: Vec3
     position: Vec3
-    object_idx: int
+    normal: Vec3
+    geom: RigidGeom | None = None
+
+    @property
+    def is_hit(self) -> bool:
+        assert 0.0 <= self.distance
+        return self.distance < _MAX_RAY_DISTANCE
+
+    @classmethod
+    def no_hit(cls) -> 'RayHit':
+        return RayHit(_MAX_RAY_DISTANCE, Vec3.zero(), Vec3.zero(), None)
 
 
 class Plane:
@@ -40,15 +54,7 @@ class Plane:
         dist = ray.origin.dot(self.normal) + self.distance
 
         if -EPSILON < dot or dist < EPSILON:
-            return RayHit(is_hit=False, distance=0, normal=Vec3.zero(), position=Vec3.zero(), object_idx=-1)
-
-        dist_along_ray = dist / -dot
-
-        return RayHit(
-            is_hit=True,
-            distance=dist_along_ray,
-            normal=self.normal,
-            position=ray.origin + ray.direction * dist_along_ray,
-            object_idx=0
-        )
-
+            return RayHit.no_hit()
+        else:
+            dist_along_ray = dist / -dot
+            return RayHit(dist_along_ray, ray.origin + ray.direction * dist_along_ray, self.normal, None)
